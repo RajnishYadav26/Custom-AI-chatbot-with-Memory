@@ -18,6 +18,12 @@ from chatbot.chroma_store import ChromaStore
 from chatbot.dynamic_topk import DynamicTopK
 from chatbot.query_expansion import QueryExpansion
 from chatbot.duplicate_remover import DuplicateRemover
+from chatbot.long_term_memory import LongTermMemory
+
+print("=" * 60)
+print("LOADING MY LLM.PY")
+print(__file__)
+print("=" * 60)
 
 
 # ----------------------------------------------------
@@ -45,6 +51,7 @@ memory = MemoryManager()
 session = SessionManager()
 token_counter = TokenCounter()
 profile = UserProfile()
+long_memory = LongTermMemory()
 
 prompt_builder = PromptBuilder()
 
@@ -92,13 +99,29 @@ memory.load_history(
 
 def get_ai_response(user_message):
 
+    category = memory_store.category_classifier.detect_category_from_query(
+    user_message
+)
+
+if category:
+
+    category_memories = memory_agent.get_memories_by_category(
+        category
+    )
+
+    print("Category:", category)
+
+    print(category_memories)
+
     # Save user message
     memory.add_user_message(user_message)
 
     # Update user profile
     update_user_profile(user_message)
+    update_long_term_memory(user_message)
 
     profile_data = profile.load_profile()
+    memory_data = long_memory.load()
 
     profile_text = ""
 
@@ -107,6 +130,15 @@ def get_ai_response(user_message):
             "Known User Information:\n"
             f"{profile_data}\n\n"
         )
+
+    memory_text = ""
+
+    if memory_data:
+
+        memory_text = (
+        "Long Term Memory:\n"
+        f"{memory_data}\n\n"
+    )
 
     expanded_query = query_expansion.expand(user_message)
 
@@ -151,7 +183,12 @@ def get_ai_response(user_message):
             "role": "user",
             "parts": [
                 {
-                    "text": profile_text + "\n" + rag_prompt
+                 "text": (
+                    memory_text +
+                    profile_text +
+                    "\n" +
+                    rag_prompt
+                 )        
                 }
             ]
         }
@@ -255,3 +292,34 @@ def clear_chat():
     memory.load_history([])
 
     session.save_session([])
+
+def update_long_term_memory(user_message):
+
+    memory = long_memory.load()
+
+    patterns = {
+
+        "name": r"my name is (.+)",
+
+        "occupation": r"i am (.+)",
+
+        "goal": r"my goal is (.+)",
+
+        "favorite_language": r"i like (.+)",
+
+        "skill": r"i know (.+)"
+    }
+
+    for key, pattern in patterns.items():
+
+        match = re.search(
+            pattern,
+            user_message,
+            re.IGNORECASE
+        )
+
+        if match:
+
+            memory[key] = match.group(1).strip()
+
+    long_memory.save(memory)

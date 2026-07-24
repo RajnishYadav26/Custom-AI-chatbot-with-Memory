@@ -4,19 +4,18 @@ import streamlit as st
 from chatbot.user_profile import UserProfile
 
 
-import chatbot.llm as llm
 
-print("LLM FILE:", llm.__file__)
-print("LLM FUNCTIONS:", dir(llm))
 
-get_ai_response = llm.get_ai_response
-clear_chat = llm.clear_chat
-get_token_usage = llm.get_token_usage
+
+from chatbot.llm import (
+    get_ai_response,
+    clear_chat,
+    get_token_usage
+)
 profile = UserProfile()
 
-
 profile_data = profile.load_profile()
- 
+
 
 
 st.sidebar.markdown("---")
@@ -126,25 +125,12 @@ if st.sidebar.button(" Clear Chat"):
 
 st.title(" Custom AI Chatbot with Memory")
 
-st.markdown(
-"""
-### Welcome 
-
-This chatbot supports:
-
-- 💬 Multi-turn Conversation
-- 🧠 Memory
-- 💾 Session Saving
-- 📊 Token Counter
-- ✂ Automatic Memory Pruning
-- ⚡ Gemini API
-"""
-)
-
-st.divider()
 
 
-# Session State
+
+
+
+ ##Session State
 
 
 if "messages" not in st.session_state:
@@ -162,8 +148,8 @@ for message in st.session_state.messages:
         st.markdown(message["content"])
 
 
-# Chat Input
-# ==========================================
+
+
 # Chat Input
 # ==========================================
 
@@ -190,15 +176,11 @@ if prompt:
 
             response = get_ai_response(prompt)
 
-            st.write("DEBUG TYPE:", type(response))
-            st.write("IS GENERATOR:", hasattr(response, "__next__"))
+            
+        with st.chat_message("assistant"):
+            full_response = st.write_stream(response)
 
-            print("TYPE:", type(response))
-            print("VALUE:", response)
-
-            with st.chat_message("assistant"):
-               full_response = st.write_stream(response)
-
+        
         st.session_state.messages.append(
             {
                 "role": "assistant",
