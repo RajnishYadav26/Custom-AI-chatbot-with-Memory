@@ -152,3 +152,7 @@ class RouterAgent:
             agents.append("research")
 
         return agents
+
+        if trigger.should_search(query, rag_context):
+
+            agents.append("web")

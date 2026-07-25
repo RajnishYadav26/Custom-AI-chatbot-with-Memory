@@ -19,6 +19,9 @@ from chatbot.dynamic_topk import DynamicTopK
 from chatbot.query_expansion import QueryExpansion
 from chatbot.duplicate_remover import DuplicateRemover
 from chatbot.long_term_memory import LongTermMemory
+from chatbot.web_trigger import WebTrigger
+from chatbot.web_agent import WebAgent
+from chatbot.memory_store import MemoryStore
 
 print("=" * 60)
 print("LOADING MY LLM.PY")
@@ -52,6 +55,9 @@ session = SessionManager()
 token_counter = TokenCounter()
 profile = UserProfile()
 long_memory = LongTermMemory()
+web_trigger = WebTrigger()
+web_agent = WebAgent()
+memory_store = MemoryStore()
 
 prompt_builder = PromptBuilder()
 
@@ -100,18 +106,18 @@ memory.load_history(
 def get_ai_response(user_message):
 
     category = memory_store.category_classifier.detect_category_from_query(
-    user_message
+        user_message
 )
 
-if category:
+    if category:
 
-    category_memories = memory_agent.get_memories_by_category(
-        category
+        category_memories = memory_agent.get_memories_by_category(
+            category
     )
 
-    print("Category:", category)
+        print("Category:", category)
 
-    print(category_memories)
+        print(category_memories)
 
     # Save user message
     memory.add_user_message(user_message)
@@ -163,20 +169,61 @@ if category:
     print(retrieved_chunks)
     print("===========================")
 
-    if not retrieved_chunks:
+    # -----------------------------
+# Build RAG Context
+# -----------------------------
 
-        rag_prompt = user_message
+    rag_context = ""
 
-    else:
+    if retrieved_chunks:
 
-        context = retriever.build_context(
+        rag_context = retriever.build_context(
             retrieved_chunks
-        )
+    )
 
-        rag_prompt = prompt_builder.build_prompt(
-            context,
-            user_message
-        )
+# -----------------------------
+# Decide if Web Search is Needed
+# -----------------------------
+
+    web_context = ""
+
+    if web_trigger.should_search(
+
+        user_message,
+
+        rag_context
+
+):
+
+       print("Using Web Search...")
+
+       data = web_agent.retrieve(
+
+           user_message
+
+    )
+
+       web_context = data["context"]
+
+# -----------------------------
+# Build Final Prompt
+# -----------------------------
+
+    combined_context = rag_context
+
+    if web_context:
+
+        combined_context += "\n\nWEB SEARCH\n\n"
+
+        combined_context += web_context
+
+    rag_prompt = prompt_builder.build_prompt(
+
+    combined_context,
+
+    user_message
+
+)
 
     contents = [
         {

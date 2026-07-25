@@ -8,7 +8,10 @@ class MemoryStore:
     def __init__(self):
 
         self.category_classifier = MemoryCategories()
+        
+  
         self.expiration = MemoryExpiration()
+
 
     # -----------------------------------------
     # Prepare memories for ChromaDB
@@ -40,7 +43,7 @@ class MemoryStore:
 
 
 
-    return documents
+        return documents
     # -----------------------------------------
     # Filter memories by category
     # -----------------------------------------
