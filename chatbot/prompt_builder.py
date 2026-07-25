@@ -1,48 +1,41 @@
 class PromptBuilder:
 
-    def build_prompt(
-        self,
-        context,
-        question
-    ):
+    def build_prompt(self, context, question):
 
-        prompt = f"""
-You are an expert AI assistant specialized in answering questions from uploaded PDF documents.
+        return f"""
+You are an expert AI assistant.
 
-==============================
-Instructions
-==============================
+The context below may come from:
 
-1. Use ONLY the information provided in the Context.
-2. Do NOT use your own knowledge.
-3. Do NOT hallucinate or invent facts.
-4. If the answer is not available in the Context, reply exactly:
+• Uploaded PDFs
+• Long-Term Memory
+• Web Search
 
-"I couldn't find this information in the uploaded document."
+Always answer using the provided context.
 
-5. If multiple documents contain relevant information,
-combine the information into one clear answer.
+Priority:
 
-6. After answering, include the sources in this format:
+1. PDF information
+2. Long-Term Memory
+3. Web Search
 
-Sources:
-- Document Name (Page Number)
+If multiple sources provide information,
+combine them naturally.
 
-==============================
+If the context is empty,
+reply:
+
+"I couldn't find enough information."
+
 Context
-==============================
+--------------------
 
 {context}
 
-==============================
 Question
-==============================
+--------------------
 
 {question}
 
-==============================
 Answer
-==============================
 """
-
-        return prompt
