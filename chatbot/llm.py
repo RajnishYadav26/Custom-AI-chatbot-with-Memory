@@ -17,14 +17,6 @@ from chatbot.hybrid_search import HybridSearch
 from chatbot.web_trigger import WebTrigger
 from chatbot.web_agent import WebAgent
 
-
-
-from dotenv import load_dotenv
-
-from google import genai
-
-
-
 from chatbot.memory import MemoryManager
 
 from chatbot.session import SessionManager
@@ -46,7 +38,7 @@ from chatbot.query_expansion import QueryExpansion
 from chatbot.duplicate_remover import DuplicateRemover
 
 from chatbot.long_term_memory import LongTermMemory
-import os
+import ollama
 
 
 
@@ -61,36 +53,6 @@ print("=" * 60)
 
 
 
-
-# ----------------------------------------------------
-
-# Load Environment Variables
-
-# ----------------------------------------------------
-
-
-
-load_dotenv()
-
-
-
-# ----------------------------------------------------
-
-# Gemini Client
-
-# ----------------------------------------------------
-
-
-
-client = genai.Client(
-
-    api_key=os.getenv("GEMINI_API_KEY")
-
-)
-
-
-
-# ----------------------------------------------------
 
 # Managers
 
@@ -525,99 +487,55 @@ def update_user_profile(user_message):
 
 def stream_ai_response(contents):
 
+    # Convert your prompt into plain text
+    prompt = ""
 
+    for msg in contents:
+        for part in msg["parts"]:
+            prompt += part["text"] + "\n"
 
-    response = client.models.generate_content_stream(
+    response = ollama.chat(
 
-        model="gemini-2.5-flash",
+        model="llama3.2",
 
-        contents=contents
+        messages=[
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ]
 
     )
 
+    full_response = response["message"]["content"]
 
-
-    full_response = ""
-
-
-
-    for chunk in response:
-
-
-
-        if chunk.text:
-
-
-
-            full_response += chunk.text
-
-
-
-            yield chunk.text
-
-
+    yield full_response
 
     memory.add_ai_message(full_response)
 
-
-
     total_tokens = token_counter.count_history(
-
         memory.get_history()
-
     )
-
-
 
     if total_tokens > MAX_TOKENS:
-
         memory.prune_history(keep_last=10)
 
-
-
     session.save_session(
-
         memory.save_history()
-
     )
 
 
-
-
-
-# ----------------------------------------------------
-
-# Token Usage
-
-# ----------------------------------------------------
-
+# Token Usage # ----------------------------------------------------
 def get_token_usage():
-
-
-
     return token_counter.count_history(
-
-        memory.get_history()
-
-    )
+        memory.get_history() )
 
 
-
-
-
-# ----------------------------------------------------
-
-# Clear Chat
-
-# ----------------------------------------------------
+# Clear Chat # ----------------------------------------------------
 
 def clear_chat():
 
-
-
-    memory.load_history([])
-
-
+    memory.load_history([]) 
 
     session.save_session([])
 
