@@ -4,10 +4,11 @@ import re
 class RouterAgent:
 
     def __init__(self):
-
         pass
 
     def needs_memory(self, query):
+
+        query = query.lower()
 
         patterns = [
 
@@ -23,75 +24,47 @@ class RouterAgent:
 
             r"\bfavorite\b"
 
-    ]
-
-        query = query.lower()
+        ]
 
         return any(
-            re.search(p, query)
-            for p in patterns
-    )
-
-    def needs_research(self, query):
-
-        patterns = [
-
-            r"what is",
-
-            r"explain",
-
-            r"define",
-
-            r"difference",
-
-           r"compare",
-
-           r"advantages",
-
-           r"disadvantages",
-
-           r"how does"
-
-    ]
-
-        query = query.lower()
-
-        return any(
-            p in query
-            for p in patterns
-    )
-
+            re.search(pattern, query)
+            for pattern in patterns
+        )
 
     def needs_pdf(self, query):
 
-        patterns = [
+        query = query.lower()
+
+        keywords = [
 
             "pdf",
 
             "document",
 
-            "page",
-
             "uploaded",
+
+            "page",
 
             "chapter",
 
             "paper",
 
+            "resume",
+
             "summarize this file"
 
-    ]
-
-        query = query.lower()
+        ]
 
         return any(
-            p in query
-            for p in patterns
-    )
+            keyword in query
+            for keyword in keywords
+        )
 
     def needs_code(self, query):
 
-        patterns = [
+        query = query.lower()
+
+        keywords = [
 
             "python",
 
@@ -105,54 +78,66 @@ class RouterAgent:
 
             "sql",
 
-           "docker",
+            "docker",
 
-           "api",
+            "api",
 
-           "bug",
+            "bug",
 
-           "debug",
+            "debug",
 
-           "code",
+            "code",
 
-           "algorithm"
+            "algorithm"
 
-    ]
+        ]
+
+        return any(
+            keyword in query
+            for keyword in keywords
+        )
+
+    def needs_research(self, query):
 
         query = query.lower()
 
-        return any(
-            p in query
-            for p in patterns
-    )
+        keywords = [
 
+            "what is",
+
+            "explain",
+
+            "define",
+
+            "difference",
+
+            "compare",
+
+            "advantages",
+
+            "disadvantages",
+
+            "how does"
+
+        ]
+
+        return any(
+            keyword in query
+            for keyword in keywords
+        )
 
     def route(self, query):
 
-        agents = []
-
         if self.needs_memory(query):
-
-            agents.append("memory")
-
-        if self.needs_research(query):
-
-            agents.append("research")
+            return "memory"
 
         if self.needs_pdf(query):
-
-            agents.append("pdf")
+            return "pdf"
 
         if self.needs_code(query):
+            return "code"
 
-            agents.append("code")
+        if self.needs_research(query):
+            return "research"
 
-        if not agents:
-
-            agents.append("research")
-
-        return agents
-
-        if trigger.should_search(query, rag_context):
-
-            agents.append("web")
+        return "general"
