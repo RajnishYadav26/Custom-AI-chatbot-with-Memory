@@ -128,16 +128,16 @@ class RouterAgent:
 
     def route(self, query):
 
-        if self.needs_memory(query):
-            return "memory"
-
         if self.needs_pdf(query):
             return "pdf"
+
+        if self.needs_memory(query):
+            return "memory"
 
         if self.needs_code(query):
             return "code"
 
         if self.needs_research(query):
-            return "research"
+           return "research"
 
         return "general"

@@ -1,35 +1,53 @@
 class PromptBuilder:
 
-    def build_prompt(self, context, question):
-        return f"""
+    def build_prompt(
+
+        self,
+
+        context,
+
+        question,
+
+        web_context=""
+
+    ):
+
+        prompt = f"""
 You are an intelligent AI assistant.
 
 Rules:
 
 1. Answer ONLY the CURRENT question.
 
-2. Do NOT answer previous questions unless the user explicitly refers to them.
+2. Ignore previous questions unless the user explicitly refers to them.
 
-3. Use the retrieved context ONLY if it is relevant to the current question.
+3. Use PDF Context only if it is relevant.
 
-4. If the retrieved context is unrelated, IGNORE it completely.
+4. Use Web Context only if it is relevant.
 
-5. For general knowledge questions (AI, LLM, Python, Deep Learning, Machine Learning, etc.), answer using your own knowledge.
+5. If both are empty, answer using your own knowledge.
 
-6. For questions about the candidate, resume, projects, skills, education or experience, answer ONLY from the retrieved context.
+--------------------------------------------------
+PDF CONTEXT
+--------------------------------------------------
 
-7. If the answer is not available in the retrieved context for a resume-related question, say:
-"I couldn't find that information in the retrieved documents."
-
-8. Never mix resume information with general knowledge.
-
-Retrieved Context
------------------
 {context}
 
-Current Question
-----------------
+--------------------------------------------------
+WEB CONTEXT
+--------------------------------------------------
+
+{web_context}
+
+--------------------------------------------------
+CURRENT QUESTION
+--------------------------------------------------
+
 {question}
 
-Answer:
+--------------------------------------------------
+ANSWER
+--------------------------------------------------
 """
+
+        return prompt

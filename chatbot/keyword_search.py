@@ -4,7 +4,6 @@ from rank_bm25 import BM25Okapi
 class KeywordSearch:
 
     def __init__(self):
-
         self.documents = []
         self.bm25 = None
 
@@ -14,6 +13,12 @@ class KeywordSearch:
 
     def build(self, chunks):
 
+        if not chunks:
+            print("No documents found. BM25 index skipped.")
+            self.documents = []
+            self.bm25 = None
+            return
+
         self.documents = chunks
 
         tokenized = [
@@ -21,7 +26,14 @@ class KeywordSearch:
             for chunk in chunks
         ]
 
+        if len(tokenized) == 0:
+            print("No tokenized documents. BM25 skipped.")
+            self.bm25 = None
+            return
+
         self.bm25 = BM25Okapi(tokenized)
+
+        print(f"BM25 Index Built ({len(chunks)} documents)")
 
     # -----------------------------------
     # Keyword Search
@@ -34,7 +46,7 @@ class KeywordSearch:
     ):
 
         if self.bm25 is None:
-            raise Exception("BM25 index has not been built.")
+            return []
 
         tokens = query.lower().split()
 

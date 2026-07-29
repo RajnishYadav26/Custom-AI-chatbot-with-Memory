@@ -51,9 +51,14 @@ retriever = Retriever(
 
 keyword_search = KeywordSearch()
 
-keyword_search.build(
-    vector_store.get_all_chunks()
-)
+all_chunks = vector_store.get_all_chunks()
+
+print("Total chunks:", len(all_chunks))
+
+if all_chunks:
+    keyword_search.build(all_chunks)
+else:
+    print("No documents found. Skipping BM25 index.")
 
 hybrid_search = HybridSearch(
     semantic_search=retriever,
@@ -169,7 +174,14 @@ def get_ai_response(user_message):
             user_message
         )
 
-        print(f"Retrieved Chunks: {len(retrieved_chunks)}")
+        print("="*60)
+        print("Retrieved Chunks:", len(retrieved_chunks))
+        print("="*60)
+
+        for c in retrieved_chunks:
+           print(c["document"])
+           print(c["text"][:300])
+           print("-"*50)
 
     elif route == "research":
 
@@ -193,6 +205,7 @@ def get_ai_response(user_message):
         print("Code Agent Selected")
 
         # Future implementation
+        
         pass
 
     else:
@@ -203,34 +216,30 @@ def get_ai_response(user_message):
     # Build Prompt
     # -----------------------------------
 
-    prompt = prompt_builder.build_prompt(
+    if route == "pdf":
 
-        context=rag_context,
-
-        question=user_message,
-
-        web_context=web_context
-
+        final_prompt = prompt_builder.build_prompt(
+            context=rag_context,
+            question=user_message,
+            web_context=""
     )
 
-    # -----------------------------------
-    # Final Prompt
-    # -----------------------------------
+    elif route == "research":
 
-    final_prompt = (
-
-        profile_text +
-
-        memory_text +
-
-        prompt
-
+        final_prompt = prompt_builder.build_prompt(
+            context="",
+            question=user_message,
+            web_context=web_context
     )
 
-    print("=" * 60)
-    print("FINAL PROMPT")
-    print(final_prompt)
-    print("=" * 60)
+    else:
+    # General question: don't include resume or web context
+        final_prompt = user_message
+
+        print("=" * 60)
+        print("FINAL PROMPT")
+        print(final_prompt)
+        print("=" * 60)
 
     contents = [
 
@@ -473,6 +482,3 @@ def debug_pipeline():
 
     print("=" * 60)   
     
-
-
-
