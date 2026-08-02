@@ -1,5 +1,6 @@
 import re
 import ollama
+import time
 
 from chatbot.memory import MemoryManager
 from chatbot.session import SessionManager
@@ -44,6 +45,7 @@ web_trigger = WebTrigger()
 web_agent = WebAgent()
 router = RouterAgent()
 
+ 
 retriever = Retriever(
     embedder=embedder,
     vector_store=vector_store
@@ -480,5 +482,26 @@ def debug_pipeline():
 
     print(long_memory.load())
 
-    print("=" * 60)   
+    print("=" * 60) 
+
+    start = time.time()
+    embedder = EmbeddingModel()
+    print("Embedder:", time.time() - start)
+
+    start = time.time()
+    vector_store = ChromaStore()
+    print("Chroma:", time.time() - start)
+
+    start = time.time()
+    keyword_search = KeywordSearch()
+    print("Keyword:", time.time() - start)
+
+    start = time.time()
+    all_chunks = vector_store.get_all_chunks()
+    print("Chunks:", len(all_chunks))
+    print("Load Chunks:", time.time() - start)
+
+    start = time.time()
+    keyword_search.build(all_chunks)
+    print("BM25 Build:", time.time() - start) 
     
