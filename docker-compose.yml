@@ -1,15 +1,15 @@
-version: "3.9"
-
 services:
 
   chatbot:
-
     build: .
-
     container_name: ai_chatbot
 
     ports:
       - "8501:8501"
+
+    depends_on:
+      - ollama
+      - chromadb
 
     volumes:
       - .:/app
@@ -17,13 +17,7 @@ services:
     env_file:
       - .env
 
-    depends_on:
-      - ollama
-
-    restart: unless-stopped
-
   ollama:
-
     image: ollama/ollama
 
     container_name: ollama
@@ -34,8 +28,22 @@ services:
     volumes:
       - ollama_data:/root/.ollama
 
-    restart: unless-stopped
+  chromadb:
+    image: chromadb/chroma:latest
+
+    container_name: chromadb
+
+    ports:
+      - "8000:8000"
+
+    volumes:
+      - chroma_data:/chroma/chroma
+
+    environment:
+      - IS_PERSISTENT=TRUE
 
 volumes:
 
   ollama_data:
+
+  chroma_data:

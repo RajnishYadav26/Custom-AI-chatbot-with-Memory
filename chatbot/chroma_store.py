@@ -5,8 +5,9 @@ class ChromaStore:
 
     def __init__(self):
 
-        self.client = chromadb.PersistentClient(
-            path="chroma_db"
+        self.client = chromadb.HttpClient(
+            host="chromadb",
+            port=8000
         )
 
         self.collection = self.client.get_or_create_collection(
