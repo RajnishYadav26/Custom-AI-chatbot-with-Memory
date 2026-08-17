@@ -1,6 +1,6 @@
 import re
-import ollama
 import time
+import ollama
 
 from chatbot.memory import MemoryManager
 from chatbot.session import SessionManager
@@ -26,6 +26,34 @@ from chatbot.web_agent import WebAgent
 from chatbot.tokenizer import TokenCounter
 from chatbot.router_agent import RouterAgent
 
+
+# =========================================================
+# OLLAMA
+# =========================================================
+
+# IMPORTANT FOR DOCKER
+#
+# Ollama is running in another Docker container
+# named "ollama".
+#
+# Therefore we connect to:
+#
+# http://ollama:11434
+#
+# NOT:
+#
+# http://localhost:11434
+#
+
+ollama_client = ollama.Client(
+    host="http://ollama:11434"
+)
+
+
+# =========================================================
+# INITIALIZE COMPONENTS
+# =========================================================
+
 router = RouterAgent()
 
 embedder = EmbeddingModel()
@@ -33,8 +61,11 @@ embedder = EmbeddingModel()
 vector_store = ChromaStore()
 
 memory = MemoryManager()
+
 session = SessionManager()
+
 profile = UserProfile()
+
 long_memory = LongTermMemory()
 
 token_counter = TokenCounter()
@@ -42,30 +73,77 @@ token_counter = TokenCounter()
 prompt_builder = PromptBuilder()
 
 web_trigger = WebTrigger()
-web_agent = WebAgent()
-router = RouterAgent()
 
- 
+web_agent = WebAgent()
+
+
+# =========================================================
+# RETRIEVER
+# =========================================================
+
 retriever = Retriever(
     embedder=embedder,
     vector_store=vector_store
 )
 
+
+# =========================================================
+# KEYWORD SEARCH
+# =========================================================
+
 keyword_search = KeywordSearch()
 
+
+# Get documents from Chroma
 all_chunks = vector_store.get_all_chunks()
+
+print("=" * 60)
+print("DOCUMENT DATABASE")
+print("=" * 60)
 
 print("Total chunks:", len(all_chunks))
 
+
+# IMPORTANT:
+# BM25 crashes when there are zero documents.
+#
+# Therefore only build it if documents exist.
+
 if all_chunks:
-    keyword_search.build(all_chunks)
+
+    keyword_search.build(
+        all_chunks
+    )
+
+    print("BM25 index created.")
+
 else:
-    print("No documents found. Skipping BM25 index.")
+
+    print(
+        "No documents found."
+    )
+
+    print(
+        "Skipping BM25 index."
+    )
+
+
+# =========================================================
+# HYBRID SEARCH
+# =========================================================
 
 hybrid_search = HybridSearch(
+
     semantic_search=retriever,
+
     keyword_search=keyword_search
+
 )
+
+
+# =========================================================
+# OTHER COMPONENTS
+# =========================================================
 
 query_expansion = QueryExpansion()
 
@@ -73,30 +151,96 @@ dynamic_topk = DynamicTopK()
 
 duplicate_remover = DuplicateRemover()
 
+
+# =========================================================
+# CONFIGURATION
+# =========================================================
+
 MAX_TOKENS = 12000
 
+
+# =========================================================
+# LOAD PREVIOUS SESSION
+# =========================================================
+
 memory.load_history(
+
     session.load_session()
+
 )
 
 
+# =========================================================
+# BUILD RAG CONTEXT
+# =========================================================
+
 def build_rag_context(user_message):
 
-    expanded_query = query_expansion.expand(user_message)
+    print("=" * 60)
+    print("BUILDING PDF CONTEXT")
+    print("=" * 60)
 
-    top_k = dynamic_topk.get_top_k(expanded_query)
+    # -----------------------------------------
+    # Query Expansion
+    # -----------------------------------------
+
+    expanded_query = query_expansion.expand(
+        user_message
+    )
+
+    print("Expanded Query:")
+    print(expanded_query)
+
+    # -----------------------------------------
+    # Dynamic Top K
+    # -----------------------------------------
+
+    top_k = dynamic_topk.get_top_k(
+        expanded_query
+    )
+
+    print("Top K:", top_k)
+
+    # -----------------------------------------
+    # Hybrid Search
+    # -----------------------------------------
 
     chunks = hybrid_search.search(
+
         expanded_query,
+
         top_k=top_k
+
     )
+
+    # -----------------------------------------
+    # Remove duplicates
+    # -----------------------------------------
 
     chunks = duplicate_remover.remove_duplicates(
         chunks
     )
 
+    print(
+        "Retrieved chunks:",
+        len(chunks)
+    )
+
+    # -----------------------------------------
+    # No results
+    # -----------------------------------------
+
     if not chunks:
+
+        print(
+            "No PDF chunks found."
+        )
+
         return "", []
+
+    # -----------------------------------------
+    # Build context
+    # -----------------------------------------
 
     context = retriever.build_context(
         chunks
@@ -104,144 +248,356 @@ def build_rag_context(user_message):
 
     return context, chunks
 
+
+# =========================================================
+# GET AI RESPONSE
+# =========================================================
+
 def get_ai_response(user_message):
 
-    # -----------------------------------
-    # Save User Message
-    # -----------------------------------
+    # =====================================================
+    # SAVE USER MESSAGE
+    # =====================================================
 
-    memory.add_user_message(user_message)
+    memory.add_user_message(
+        user_message
+    )
 
-    print("Conversation History:")
-    print(memory.get_history())
+    print("=" * 60)
+    print("QUESTION")
+    print("=" * 60)
 
-    update_user_profile(user_message)
+    print(user_message)
 
 
-    update_long_term_memory(user_message)
+    # =====================================================
+    # UPDATE USER MEMORY
+    # =====================================================
 
-        # -----------------------------------
-    # Load Stored Memory
-    # -----------------------------------
+    update_user_profile(
+        user_message
+    )
+
+    update_long_term_memory(
+        user_message
+    )
+
+
+    # =====================================================
+    # LOAD USER PROFILE
+    # =====================================================
 
     profile_data = profile.load_profile()
 
     long_memory_data = long_memory.load()
+
 
     profile_text = ""
 
     if profile_data:
 
         profile_text = (
+
             "USER PROFILE\n"
+
             "---------------------\n"
+
             f"{profile_data}\n\n"
+
         )
+
 
     memory_text = ""
 
     if long_memory_data:
 
         memory_text = (
+
             "LONG TERM MEMORY\n"
+
             "---------------------\n"
+
             f"{long_memory_data}\n\n"
+
         )
 
-    # -----------------------------------
-    # Retrieve PDF Context
-    # -----------------------------------
 
-            # -----------------------------------
-    # Route the Query
-    # -----------------------------------
+    # =====================================================
+    # ROUTE QUERY
+    # =====================================================
 
-    route = router.route(user_message)
+    route = router.route(
+        user_message
+    )
 
     print("=" * 60)
-    print(f"Route Selected: {route}")
+    print("ROUTE SELECTED:", route)
     print("=" * 60)
+
+
+    # =====================================================
+    # EMPTY CONTEXT
+    # =====================================================
 
     rag_context = ""
+
     retrieved_chunks = []
+
     web_context = ""
 
-    # -----------------------------------
-    # Execute Selected Route
-    # -----------------------------------
+
+    # =====================================================
+    # PDF ROUTE
+    # =====================================================
 
     if route == "pdf":
 
-        rag_context, retrieved_chunks = build_rag_context(
-            user_message
+        print(
+            "Using PDF / Resume Search..."
         )
 
-        print("="*60)
-        print("Retrieved Chunks:", len(retrieved_chunks))
-        print("="*60)
+        rag_context, retrieved_chunks = (
+            build_rag_context(
+                user_message
+            )
+        )
 
-        for c in retrieved_chunks:
-           print(c["document"])
-           print(c["text"][:300])
-           print("-"*50)
+
+        print("=" * 60)
+        print(
+            "Retrieved Chunks:",
+            len(retrieved_chunks)
+        )
+        print("=" * 60)
+
+
+        # Show retrieved documents
+        for chunk in retrieved_chunks:
+
+            print(
+                "Document:",
+                chunk.get(
+                    "document",
+                    "unknown"
+                )
+            )
+
+            print(
+                "Page:",
+                chunk.get(
+                    "page",
+                    "unknown"
+                )
+            )
+
+            print(
+                chunk.get(
+                    "text",
+                    ""
+                )[:300]
+            )
+
+            print("-" * 50)
+
+
+    # =====================================================
+    # RESEARCH ROUTE
+    # =====================================================
 
     elif route == "research":
 
-        print("Using Research/Web Agent...")
+        print(
+            "Using Research / Web..."
+        )
 
         web_data = web_agent.retrieve(
             user_message
         )
 
-        web_context = web_data["context"]
+        web_context = web_data.get(
+            "context",
+            ""
+        )
+
+
+    # =====================================================
+    # MEMORY ROUTE
+    # =====================================================
 
     elif route == "memory":
 
-        print("Memory Agent Selected")
+        print(
+            "Using Memory..."
+        )
 
-        # Future implementation
-        pass
+        # For now, allow the LLM to answer
+        # using stored user information.
+
+        final_prompt = f"""
+You are a helpful AI assistant.
+
+Answer ONLY the current question.
+
+Use the stored user information only when
+the question is actually about the user.
+
+USER INFORMATION:
+{profile_text}
+
+LONG TERM MEMORY:
+{memory_text}
+
+CURRENT QUESTION:
+{user_message}
+
+Answer clearly and directly.
+"""
+
+
+        contents = [
+
+            {
+
+                "role": "user",
+
+                "parts": [
+
+                    {
+
+                        "text": final_prompt
+
+                    }
+
+                ]
+
+            }
+
+        ]
+
+        return stream_ai_response(
+            contents
+        )
+
+
+    # =====================================================
+    # CODE ROUTE
+    # =====================================================
 
     elif route == "code":
 
-        print("Code Agent Selected")
+        print(
+            "Using Code / General LLM..."
+        )
 
-        # Future implementation
-        
-        pass
+
+    # =====================================================
+    # GENERAL ROUTE
+    # =====================================================
 
     else:
 
-        print("General LLM Response")
+        print(
+            "Using General LLM..."
+        )
 
-    # -----------------------------------
-    # Build Prompt
-    # -----------------------------------
+
+    # =====================================================
+    # BUILD FINAL PROMPT
+    # =====================================================
 
     if route == "pdf":
 
-        final_prompt = prompt_builder.build_prompt(
-            context=rag_context,
-            question=user_message,
-            web_context=""
-    )
+        # -------------------------------------------------
+        # PDF QUESTION
+        # -------------------------------------------------
+
+        if rag_context:
+
+            final_prompt = prompt_builder.build_prompt(
+
+                context=rag_context,
+
+                question=user_message,
+
+                web_context=""
+
+            )
+
+        else:
+
+            # IMPORTANT:
+            #
+            # Do NOT let the model invent resume information.
+            #
+
+            final_prompt = f"""
+You are an AI assistant.
+
+The user is asking about their uploaded resume.
+
+However, no relevant information was found
+in the uploaded resume.
+
+Do NOT invent resume information.
+
+Tell the user that the requested information
+could not be found in the uploaded resume.
+
+CURRENT QUESTION:
+{user_message}
+
+Answer:
+"""
+
 
     elif route == "research":
 
         final_prompt = prompt_builder.build_prompt(
+
             context="",
+
             question=user_message,
+
             web_context=web_context
-    )
+
+        )
+
 
     else:
-    # General question: don't include resume or web context
+
+        # -------------------------------------------------
+        # GENERAL QUESTION
+        # -------------------------------------------------
+
+        # Do NOT include resume context.
+        # Do NOT include long-term memory.
+        # Do NOT include profile.
+        #
+        # This prevents:
+        #
+        # "What is Gen AI?"
+        #
+        # from becoming a resume answer.
+
         final_prompt = user_message
 
-        print("=" * 60)
-        print("FINAL PROMPT")
-        print(final_prompt)
-        print("=" * 60)
+
+    # =====================================================
+    # DEBUG
+    # =====================================================
+
+    print("=" * 60)
+    print("FINAL PROMPT")
+    print("=" * 60)
+
+    print(final_prompt)
+
+    print("=" * 60)
+
+
+    # =====================================================
+    # CREATE CONTENTS
+    # =====================================================
 
     contents = [
 
@@ -263,30 +619,47 @@ def get_ai_response(user_message):
 
     ]
 
-    return stream_ai_response(contents)
+
+    # =====================================================
+    # SEND TO OLLAMA
+    # =====================================================
+
+    return stream_ai_response(
+        contents
+    )
+
+
+# =========================================================
+# STREAM AI RESPONSE
+# =========================================================
 
 def stream_ai_response(contents):
 
-    # ------------------------------------
-    # Extract Prompt
-    # ------------------------------------
-
     prompt = contents[0]["parts"][0]["text"]
 
+
     print("=" * 60)
-    print("Sending Prompt to Ollama...")
+    print("SENDING PROMPT TO OLLAMA")
     print("=" * 60)
 
-    print("=" * 80)
-    print("FINAL PROMPT SENT TO LLM")
     print(prompt)
-    print("=" * 80)
+
+    print("=" * 60)
+
 
     full_response = ""
 
+
     try:
 
-        response = ollama.chat(
+        # IMPORTANT:
+        #
+        # Use ollama_client instead of ollama.chat()
+        #
+        # because Ollama is running in another
+        # Docker container.
+
+        response = ollama_client.chat(
 
             model="llama3.2",
 
@@ -306,6 +679,7 @@ def stream_ai_response(contents):
 
         )
 
+
         for chunk in response:
 
             text = chunk["message"]["content"]
@@ -314,51 +688,65 @@ def stream_ai_response(contents):
 
             yield text
 
+
     except Exception as e:
 
-        error_message = f"\nOllama Error:\n{str(e)}"
+        error_message = (
+            f"\nOllama Error: {str(e)}"
+        )
 
-        print(error_message)
+        print(
+            error_message
+        )
 
         yield error_message
 
         return
 
-    # ------------------------------------
-    # Save AI Response
-    # ------------------------------------
 
-    memory.add_ai_message(full_response)
+    # =====================================================
+    # SAVE AI RESPONSE
+    # =====================================================
 
-    # ------------------------------------
-    # Token Count
-    # ------------------------------------
-
-    total_tokens = token_counter.count_history(
-
-        memory.get_history()
-
+    memory.add_ai_message(
+        full_response
     )
 
-    print(f"Conversation Tokens: {total_tokens}")
 
-    # ------------------------------------
-    # Memory Pruning
-    # ------------------------------------
+    # =====================================================
+    # TOKEN COUNT
+    # =====================================================
+
+    total_tokens = (
+        token_counter.count_history(
+            memory.get_history()
+        )
+    )
+
+    print(
+        "Conversation Tokens:",
+        total_tokens
+    )
+
+
+    # =====================================================
+    # PRUNE MEMORY
+    # =====================================================
 
     if total_tokens > MAX_TOKENS:
 
-        print("Pruning Conversation History...")
-
-        memory.prune_history(
-
-            keep_last=10
-
+        print(
+            "Pruning Conversation History..."
         )
 
-    # ------------------------------------
-    # Save Session
-    # ------------------------------------
+        memory.prune_history(
+            keep_last=10
+        )
+
+
+    # =====================================================
+    # SAVE SESSION
+    # =====================================================
 
     session.save_session(
 
@@ -366,23 +754,40 @@ def stream_ai_response(contents):
 
     )
 
-    print("Session Saved Successfully.")
+    print(
+        "Session Saved Successfully."
+    )
 
-def update_user_profile(user_message):
 
-    profile_data = profile.load_profile()
+# =========================================================
+# UPDATE USER PROFILE
+# =========================================================
+
+def update_user_profile(
+    user_message
+):
+
+    profile_data = (
+        profile.load_profile()
+    )
+
 
     patterns = {
 
-        "name": r"my name is (.+)",
+        "name":
+        r"my name is (.+)",
 
-        "favorite_language": r"i like (.+)",
+        "favorite_language":
+        r"i like (.+)",
 
-        "occupation": r"i am (.+)",
+        "occupation":
+        r"i am (.+)",
 
-        "goal": r"my goal is (.+)"
+        "goal":
+        r"my goal is (.+)"
 
     }
+
 
     for key, pattern in patterns.items():
 
@@ -396,33 +801,55 @@ def update_user_profile(user_message):
 
         )
 
+
         if match:
 
-            profile_data[key] = match.group(1).strip()
+            profile_data[key] = (
+                match.group(1).strip()
+            )
 
-    profile.save_profile(profile_data)
+
+    profile.save_profile(
+        profile_data
+    )
 
 
-def update_long_term_memory(user_message):
+# =========================================================
+# UPDATE LONG TERM MEMORY
+# =========================================================
 
-    memory_data = long_memory.load()
+def update_long_term_memory(
+    user_message
+):
+
+    memory_data = (
+        long_memory.load()
+    )
+
 
     patterns = {
 
-        "name": r"my name is (.+)",
+        "name":
+        r"my name is (.+)",
 
-        "occupation": r"i am (.+)",
+        "occupation":
+        r"i am (.+)",
 
-        "goal": r"my goal is (.+)",
+        "goal":
+        r"my goal is (.+)",
 
-        "favorite_language": r"i like (.+)",
+        "favorite_language":
+        r"i like (.+)",
 
-        "skill": r"i know (.+)"
+        "skill":
+        r"i know (.+)"
 
     }
+
 
     updated = False
 
+
     for key, pattern in patterns.items():
 
         match = re.search(
@@ -435,15 +862,26 @@ def update_long_term_memory(user_message):
 
         )
 
+
         if match:
 
-            memory_data[key] = match.group(1).strip()
+            memory_data[key] = (
+                match.group(1).strip()
+            )
 
             updated = True
 
+
     if updated:
 
-        long_memory.save(memory_data)
+        long_memory.save(
+            memory_data
+        )
+
+
+# =========================================================
+# TOKEN USAGE
+# =========================================================
 
 def get_token_usage():
 
@@ -453,55 +891,82 @@ def get_token_usage():
 
     )
 
+
+# =========================================================
+# CLEAR CHAT
+# =========================================================
+
 def clear_chat():
 
     memory.load_history([])
 
     session.save_session([])
 
-    print("Conversation Cleared.")
+    print(
+        "Conversation Cleared."
+    )
 
+
+# =========================================================
+# DEBUG PIPELINE
+# =========================================================
 
 def debug_pipeline():
 
     print("=" * 60)
 
-    print("Conversation Length")
+    print("CONVERSATION LENGTH")
 
-    print(len(memory.get_history()))
-
-    print("=" * 60)
-
-    print("Profile")
-
-    print(profile.load_profile())
+    print(
+        len(
+            memory.get_history()
+        )
+    )
 
     print("=" * 60)
 
-    print("Long-Term Memory")
+    print("PROFILE")
 
-    print(long_memory.load())
+    print(
+        profile.load_profile()
+    )
 
-    print("=" * 60) 
+    print("=" * 60)
 
-    start = time.time()
-    embedder = EmbeddingModel()
-    print("Embedder:", time.time() - start)
+    print("LONG TERM MEMORY")
 
-    start = time.time()
-    vector_store = ChromaStore()
-    print("Chroma:", time.time() - start)
+    print(
+        long_memory.load()
+    )
 
-    start = time.time()
-    keyword_search = KeywordSearch()
-    print("Keyword:", time.time() - start)
+    print("=" * 60)
 
-    start = time.time()
-    all_chunks = vector_store.get_all_chunks()
-    print("Chunks:", len(all_chunks))
-    print("Load Chunks:", time.time() - start)
+    print("CHROMA DOCUMENTS")
 
-    start = time.time()
-    keyword_search.build(all_chunks)
-    print("BM25 Build:", time.time() - start) 
+    chunks = (
+        vector_store.get_all_chunks()
+    )
+
+    print(
+        "Total chunks:",
+        len(chunks)
+    )
+
+    for chunk in chunks[:5]:
+
+        print(
+            chunk.get(
+                "document",
+                "unknown"
+            )
+        )
+
+        print(
+            chunk.get(
+                "page",
+                "unknown"
+            )
+        )
+
+    print("=" * 60)
     

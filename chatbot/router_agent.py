@@ -6,23 +6,22 @@ class RouterAgent:
     def __init__(self):
         pass
 
+    # -----------------------------------------
+    # MEMORY QUESTIONS
+    # -----------------------------------------
+
     def needs_memory(self, query):
 
         query = query.lower()
 
         patterns = [
 
-            r"\bmy\b",
-
             r"\bremember\b",
-
-            r"\bi am\b",
-
             r"\bwho am i\b",
-
             r"\bmy name\b",
-
-            r"\bfavorite\b"
+            r"\bmy favorite\b",
+            r"\bmy goal\b",
+            r"\bmy preference\b"
 
         ]
 
@@ -31,27 +30,54 @@ class RouterAgent:
             for pattern in patterns
         )
 
+    # -----------------------------------------
+    # PDF / RESUME QUESTIONS
+    # -----------------------------------------
+
     def needs_pdf(self, query):
 
         query = query.lower()
 
         keywords = [
 
-            "pdf",
-
-            "document",
-
-            "uploaded",
-
-            "page",
-
-            "chapter",
-
-            "paper",
-
             "resume",
+            "cv",
 
-            "summarize this file"
+            "my resume",
+            "my cv",
+
+            "about my resume",
+            "about my cv",
+
+            "tell me about my resume",
+            "tell me about my cv",
+
+            "summarize my resume",
+            "summarize my cv",
+
+            "resume summary",
+            "cv summary",
+
+            "candidate",
+            "candidate name",
+            "candidate skills",
+            "candidate education",
+            "candidate experience",
+            "candidate projects",
+
+            "my skills",
+            "my education",
+            "my experience",
+            "my projects",
+
+            "uploaded document",
+            "uploaded file",
+            "uploaded pdf",
+
+            "pdf",
+            "document",
+            "page",
+            "chapter"
 
         ]
 
@@ -60,6 +86,10 @@ class RouterAgent:
             for keyword in keywords
         )
 
+    # -----------------------------------------
+    # CODE QUESTIONS
+    # -----------------------------------------
+
     def needs_code(self, query):
 
         query = query.lower()
@@ -67,27 +97,16 @@ class RouterAgent:
         keywords = [
 
             "python",
-
             "java",
-
             "javascript",
-
             "react",
-
             "fastapi",
-
             "sql",
-
             "docker",
-
             "api",
-
             "bug",
-
             "debug",
-
             "code",
-
             "algorithm"
 
         ]
@@ -97,6 +116,10 @@ class RouterAgent:
             for keyword in keywords
         )
 
+    # -----------------------------------------
+    # RESEARCH / GENERAL KNOWLEDGE
+    # -----------------------------------------
+
     def needs_research(self, query):
 
         query = query.lower()
@@ -104,20 +127,16 @@ class RouterAgent:
         keywords = [
 
             "what is",
-
+            "what are",
             "explain",
-
             "define",
-
             "difference",
-
             "compare",
-
             "advantages",
-
             "disadvantages",
-
-            "how does"
+            "how does",
+            "why does",
+            "why is"
 
         ]
 
@@ -126,18 +145,31 @@ class RouterAgent:
             for keyword in keywords
         )
 
+    # -----------------------------------------
+    # ROUTER
+    # -----------------------------------------
+
     def route(self, query):
+
+        # IMPORTANT:
+        # PDF must be checked BEFORE memory.
+        #
+        # Otherwise:
+        # "tell me about my resume"
+        #
+        # contains "my"
+        # and incorrectly becomes "memory".
 
         if self.needs_pdf(query):
             return "pdf"
-
-        if self.needs_memory(query):
-            return "memory"
 
         if self.needs_code(query):
             return "code"
 
         if self.needs_research(query):
-           return "research"
+            return "research"
+
+        if self.needs_memory(query):
+            return "memory"
 
         return "general"

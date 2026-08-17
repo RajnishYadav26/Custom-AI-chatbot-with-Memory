@@ -42,8 +42,19 @@ services:
     environment:
       - IS_PERSISTENT=TRUE
 
+  redis:
+    image: redis:7
+    container_name: redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
 volumes:
 
   ollama_data:
 
   chroma_data:
+
+  redis_data:
