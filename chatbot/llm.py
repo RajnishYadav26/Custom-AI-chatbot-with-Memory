@@ -10,6 +10,7 @@ from chatbot.long_term_memory import LongTermMemory
 from chatbot.embeddings import EmbeddingModel
 from chatbot.chroma_store import ChromaStore
 from chatbot.retriever import Retriever
+from chatbot.redis_client import RedisClient
 
 from chatbot.keyword_search import KeywordSearch
 from chatbot.hybrid_search import HybridSearch
@@ -76,6 +77,7 @@ web_trigger = WebTrigger()
 
 web_agent = WebAgent()
 
+redis_client = RedisClient()
 
 # =========================================================
 # RETRIEVER
@@ -258,10 +260,33 @@ def get_ai_response(user_message):
     # =====================================================
     # SAVE USER MESSAGE
     # =====================================================
+    redis_client.set(
+        f"llm_response:{prompt.strip().lower()}",
+        full_response,
+        expire=3600
+    )
 
     memory.add_user_message(
         user_message
     )
+
+    cache_key = f"llm_response:{user_message.strip().lower()}"
+
+    cached_response = redis_client.get(cache_key)
+
+    if cached_response:
+
+        print("=" * 60)
+        print("REDIS CACHE HIT")
+        print("=" * 60)
+
+        yield cached_response
+
+        return
+
+    print("=" * 60)
+    print("REDIS CACHE MISS")
+    print("=" * 60)
 
     print("=" * 60)
     print("QUESTION")
